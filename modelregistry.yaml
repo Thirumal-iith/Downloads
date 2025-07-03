@@ -1,0 +1,82 @@
+name: Register Model to Kubeflow Model Registry
+description: Registers a model and its version to the Kubeflow Model Registry using the official Python client.
+
+inputs:
+  - {name: model_name, type: String}
+  - {name: storage_uri, type: String}
+  - {name: version, type: String}
+  - {name: description, type: String}
+  - {name: framework, type: String}
+  - {name: framework_version, type: String}
+
+outputs:
+  - {name: model_id, type: String}
+
+implementation:
+  container:
+    image: python:3.10
+    command:
+      - sh
+      - -c
+      - |
+        pip install --pre model-registry==0.2.3a1
+        python3 -u -c "
+        import argparse
+        import os
+        from model_registry import ModelRegistry
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--model_name', type=str)
+        parser.add_argument('--storage_uri', type=str)
+        parser.add_argument('--version', type=str)
+        parser.add_argument('--description', type=str)
+        parser.add_argument('--framework', type=str)
+        parser.add_argument('--framework_version', type=str)
+        parser.add_argument('--model_id', type=str)
+        args = parser.parse_args()
+
+        # Connect to model registry (with http://)
+        registry = ModelRegistry(
+            server_address='http://model-registry-service.kubeflow.svc.cluster.local',
+            port=8080,
+            author='myname',
+            is_secure=False
+        )
+
+        # Register the model
+        response = registry.register_model(
+            name=args.model_name,
+            uri=args.storage_uri,
+            version=args.version,
+            description=args.description,
+            model_format_name=args.framework,
+            model_format_version=args.framework_version,
+            metadata={
+                'registered_by': 'pipeline',
+                'framework': args.framework,
+                'version': args.version
+            }
+        )
+
+        # Write model ID to output path
+        model_id = response['id']
+        print('Model Registered:', model_id)
+        os.makedirs(os.path.dirname(args.model_id), exist_ok=True)
+        with open(args.model_id, 'w') as f:
+            f.write(model_id)
+        "
+    args:
+      - --model_name
+      - {inputValue: model_name}
+      - --storage_uri
+      - {inputValue: storage_uri}
+      - --version
+      - {inputValue: version}
+      - --description
+      - {inputValue: description}
+      - --framework
+      - {inputValue: framework}
+      - --framework_version
+      - {inputValue: framework_version}
+      - --model_id
+      - {outputPath: model_id}
