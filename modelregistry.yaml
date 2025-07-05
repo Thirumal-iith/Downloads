@@ -35,7 +35,7 @@ implementation:
         parser.add_argument('--model_id', type=str)
         args = parser.parse_args()
 
-        # Connect to model registry (with http://)
+        # Connect to model registry 
         registry = ModelRegistry(
             server_address='http://model-registry-service.kubeflow.svc.cluster.local',
             port=8080,

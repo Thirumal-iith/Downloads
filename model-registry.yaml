@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: model-registry-server
+  namespace: kubeflow
+  labels:
+    app: model-registry
+    component: model-registry-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: model-registry
+      component: model-registry-server
+  template:
+    metadata:
+      labels:
+        app: model-registry
+        component: model-registry-server
+    spec:
+      containers:
+        - name: model-registry-server
+          image: quay.io/odahu/model-registry:0.2.3a1
+          ports:
+            - containerPort: 8080
+          env:
+            - name: STORAGE_TYPE
+              value: s3
+            - name: S3_ENDPOINT
+              value: http://minio-service.kubeflow:9000
+            - name: S3_BUCKET
+              value: mlpipeline
+            - name: S3_REGION
+              value: us-east-1
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: minio-creds
+                  key: accesskey
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-creds
+                  key: secretkey
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: model-registry-service
+  namespace: kubeflow
+  labels:
+    app: model-registry
+spec:
+  selector:
+    app: model-registry
+    component: model-registry-server
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP

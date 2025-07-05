@@ -1,0 +1,129 @@
+name: Register Model to Kubeflow Model Registry
+description: Registers a model and its version to the Kubeflow Model Registry using the official Python client.
+
+inputs:
+  - {name: registry_url, type: String}
+  - {name: author, type: String}
+  - {name: model_uri_or_repo, type: String}
+  - {name: model_name, type: String}
+  - {name: version, type: String, default: "1.0.0"}
+  - {name: description, type: String, default: "Auto-registered model"}
+  - {name: model_path, type: String, optional: true}
+  - {name: model_format_name, type: String, optional: true}
+  - {name: model_format_version, type: String, default: "1"}
+  - {name: storage_key, type: String, optional: true}
+  - {name: metadata, type: JSON, optional: true}
+
+outputs:
+  - {name: model_info, type: String}
+  - {name: registered_model, type: String}
+  - {name: model_version, type: String}
+  - {name: artifact_info, type: String}
+
+implementation:
+  container:
+    image: python:3.10
+    command:
+      - sh
+      - -c
+      - |
+        pip install model-registry
+        python3 -u -c "
+        import os
+        import json
+        import argparse
+        from urllib.parse import urlparse
+        from model_registry import ModelRegistry
+
+        def infer_model_format(uri_or_repo):
+            ext = os.path.splitext(uri_or_repo)[1].lower()
+            return {
+                '.onnx': 'onnx',
+                '.pkl': 'sklearn',
+                '.pt': 'pytorch',
+                '.joblib': 'sklearn',
+                '.h5': 'keras',
+                '.sav': 'sklearn'
+            }.get(ext, 'unknown')
+
+        def is_hf_model(uri_or_repo):
+            return '/' in uri_or_repo and not uri_or_repo.startswith('http')
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--registry_url', type=str, required=True)
+        parser.add_argument('--author', type=str, required=True)
+        parser.add_argument('--model_uri_or_repo', type=str, required=True)
+        parser.add_argument('--model_name', type=str, required=True)
+        parser.add_argument('--version', type=str, default='1.0.0')
+        parser.add_argument('--description', type=str, default='Auto-registered model')
+        parser.add_argument('--model_path', type=str, default=None)
+        parser.add_argument('--model_format_name', type=str, default=None)
+        parser.add_argument('--model_format_version', type=str, default='1')
+        parser.add_argument('--storage_key', type=str, default=None)
+        parser.add_argument('--metadata', type=json.loads, default=dict)
+
+        args = parser.parse_args()
+
+        registry = ModelRegistry(args.registry_url, author=args.author)
+
+        huggingface = is_hf_model(args.model_uri_or_repo)
+
+        model_format = args.model_format_name or infer_model_format(args.model_path or args.model_uri_or_repo)
+
+        model_path = args.model_path
+        if not model_path:
+            parsed = urlparse(args.model_uri_or_repo)
+            model_path = parsed.path.lstrip('/') if parsed.scheme in ['http', 'https'] else args.model_uri_or_repo
+
+        if huggingface:
+            model = registry.register_hf_model(
+                repo_id=args.model_uri_or_repo,
+                path=model_path,
+                version=args.version,
+                model_name=args.model_name,
+                description=args.description,
+                model_format_name=model_format,
+                model_format_version=args.model_format_version,
+                metadata=args.metadata
+            )
+        else:
+            model = registry.register_model(
+                model_name=args.model_name,
+                uri=args.model_uri_or_repo,
+                version=args.version,
+                description=args.description,
+                model_format_name=model_format,
+                model_format_version=args.model_format_version,
+                storage_key=args.storage_key,
+                storage_path=model_path,
+                metadata=args.metadata
+            )
+
+        print(f'model_info={json.dumps(model)}')
+        print(f'registered_model={json.dumps(registry.get_registered_model(args.model_name))}')
+        print(f'model_version={json.dumps(registry.get_model_version(args.model_name, args.version))}')
+        print(f'artifact_info={json.dumps(registry.get_model_artifact(args.model_name, args.version))}')
+        "
+    args:
+      - --registry_url
+      - {inputValue: registry_url}
+      - --author
+      - {inputValue: author}
+      - --model_uri_or_repo
+      - {inputValue: model_uri_or_repo}
+      - --model_name
+      - {inputValue: model_name}
+      - --version
+      - {inputValue: version}
+      - --description
+      - {inputValue: description}
+      - --model_path
+      - {inputValue: model_path}
+      - --model_format_name
+      - {inputValue: model_format_name}
+      - --model_format_version
+      - {inputValue: model_format_version}
+      - --storage_key
+      - {inputValue: storage_key}
+      - --metadata
+      - {inputValue: metadata}
