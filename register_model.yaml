@@ -1,0 +1,161 @@
+name: Register Model (All-in-One)
+description: Registers a model to the model registry from local path, URL, MinIO/S3 URI, or HuggingFace repo.
+
+inputs:
+  - {name: registry_url, type: String}
+  - {name: model_name, type: String}
+  - {name: uri_or_repo, type: String}
+  - {name: author, type: String, optional: true}
+  - {name: storage_key, type: String, optional: true}
+  - {name: model_format, type: String, optional: true}
+  - {name: description, type: String, optional: true}
+  - {name: version, type: Integer, optional: true}
+  - {name: metadata, type: JsonObject, optional: true}
+
+outputs:
+  - {name: model, type: JsonObject}
+  - {name: model_version, type: JsonObject}
+  - {name: model_artifacts, type: JsonObject}
+
+implementation:
+  container:
+    image: python:3.10
+    command:
+    - sh
+    - -c
+    - |
+      pip install --quiet model-registry
+      python3 -u -c "$0" "$@"
+    - |
+      import argparse
+      import os
+      import json
+      from model_registry import ModelRegistry, utils
+
+      def infer_model_format(uri):
+          ext = os.path.splitext(uri)[1].lower()
+          return {
+              ".onnx": "onnx",
+              ".pkl": "sklearn",
+              ".pt": "pytorch",
+              ".joblib": "sklearn",
+              ".h5": "keras",
+              ".sav": "sklearn"
+          }.get(ext, "unknown")
+
+      def is_huggingface_model(uri_or_repo):
+          return (
+              isinstance(uri_or_repo, str)
+              and "/" in uri_or_repo
+              and not uri_or_repo.startswith(("http", "s3://", "minio://", "/"))
+          )
+
+      def register_model_allinone(
+          registry_url,
+          model_name,
+          uri_or_repo,
+          author=None,
+          storage_key=None,
+          model_format=None,
+          description=None,
+          version=None,
+          metadata=None
+      ):
+          registry = ModelRegistry(registry_url, author=author)
+
+          if is_huggingface_model(uri_or_repo):
+              return registry.register_huggingface_model(
+                  model_name,
+                  repo_id=uri_or_repo,
+                  description=description,
+                  version=version,
+                  metadata=metadata or {}
+              )
+
+          if not model_format:
+              model_format = infer_model_format(uri_or_repo)
+              if model_format == "unknown":
+                  raise ValueError(f"Unknown model format for URI: {uri_or_repo}")
+
+          if uri_or_repo.startswith("minio://"):
+              if not storage_key:
+                  raise ValueError("Storage key required for MinIO URIs.")
+              uri_or_repo = utils.s3_uri_from(uri_or_repo.replace("minio://", ""), storage_key)
+          elif uri_or_repo.startswith("s3://"):
+              if not storage_key:
+                  raise ValueError("Storage key required for S3 URIs.")
+              uri_or_repo = utils.s3_uri_from(uri_or_repo.replace("s3://", ""), storage_key)
+
+          return registry.register_model(
+              model_name,
+              uri=uri_or_repo,
+              model_format=model_format,
+              description=description,
+              version=version,
+              storage_key=storage_key,
+              metadata=metadata or {}
+          )
+
+      parser = argparse.ArgumentParser()
+      parser.add_argument("--registry_url", type=str, required=True)
+      parser.add_argument("--model_name", type=str, required=True)
+      parser.add_argument("--uri_or_repo", type=str, required=True)
+      parser.add_argument("--author", type=str)
+      parser.add_argument("--storage_key", type=str)
+      parser.add_argument("--model_format", type=str)
+      parser.add_argument("--description", type=str)
+      parser.add_argument("--version", type=int)
+      parser.add_argument("--metadata", type=str)
+      parser.add_argument("--model", type=str)
+      parser.add_argument("--model_version", type=str)
+      parser.add_argument("--model_artifacts", type=str)
+
+      args = parser.parse_args()
+      metadata = json.loads(args.metadata) if args.metadata else None
+
+      result = register_model_allinone(
+          registry_url=args.registry_url,
+          model_name=args.model_name,
+          uri_or_repo=args.uri_or_repo,
+          author=args.author,
+          storage_key=args.storage_key,
+          model_format=args.model_format,
+          description=args.description,
+          version=args.version,
+          metadata=metadata
+      )
+
+      # Write each output as valid JSON
+      with open(args.model, "w") as f:
+          json.dump({"model": result.get("model") if isinstance(result, dict) else result.model}, f)
+
+      with open(args.model_version, "w") as f:
+          json.dump({"model_version": result.get("model_version") if isinstance(result, dict) else result.version}, f)
+
+      with open(args.model_artifacts, "w") as f:
+          json.dump({"model_artifacts": result.get("model_artifacts") if isinstance(result, dict) else result.artifacts}, f)
+    args:
+    - --registry_url
+    - {inputValue: registry_url}
+    - --model_name
+    - {inputValue: model_name}
+    - --uri_or_repo
+    - {inputValue: uri_or_repo}
+    - --author
+    - {inputValue: author}
+    - --storage_key
+    - {inputValue: storage_key}
+    - --model_format
+    - {inputValue: model_format}
+    - --description
+    - {inputValue: description}
+    - --version
+    - {inputValue: version}
+    - --metadata
+    - {inputValue: metadata}
+    - --model
+    - {outputPath: model}
+    - --model_version
+    - {outputPath: model_version}
+    - --model_artifacts
+    - {outputPath: model_artifacts}
