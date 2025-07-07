@@ -50,7 +50,7 @@ implementation:
             parsed = urlparse(registry_url)
             host = parsed.hostname or "localhost"
             port = parsed.port or 80
-            is_secure = parsed.scheme == "http"
+            is_secure = parsed.scheme == "https"
 
             registry = ModelRegistry(
                 server_address=host,
