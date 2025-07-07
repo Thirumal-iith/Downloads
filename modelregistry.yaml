@@ -29,6 +29,7 @@ implementation:
         python3 -u -c "$0" "$@"
       - |
         import argparse, os, json
+        from urllib.parse import urlparse
         from model_registry import ModelRegistry, utils
 
         def infer_model_format(uri):
@@ -41,12 +42,23 @@ implementation:
                 ".h5": "keras",
                 ".sav": "sklearn"
             }.get(ext, "unknown")
-            
+
         def is_huggingface_model(uri_or_repo):
             return isinstance(uri_or_repo, str) and "/" in uri_or_repo and not uri_or_repo.startswith(("http", "s3://", "minio://", "/"))
 
         def register_model_allinone(registry_url, model_name, uri_or_repo, user_token, author, storage_key, model_format, description, version, metadata):
-            registry = ModelRegistry.from_token(registry_url, token=user_token, author=author)
+            parsed = urlparse(registry_url)
+            host = parsed.hostname or "localhost"
+            port = parsed.port or 80
+            is_secure = parsed.scheme == "http"
+
+            registry = ModelRegistry(
+                server_address=host,
+                port=port,
+                author=author or "",
+                is_secure=is_secure
+            )
+            registry.authenticate(user_token)
 
             if is_huggingface_model(uri_or_repo):
                 return registry.register_huggingface_model(
