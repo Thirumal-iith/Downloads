@@ -83,6 +83,8 @@ implementation:
                 uri=uri_or_repo,
                 description=description,
                 version=int(version),
+                model_format_name=infer_model_format(uri),
+                model_format_version="1",
                 storage_key=storage_key,
                 metadata=metadata
             )
