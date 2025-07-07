@@ -63,7 +63,7 @@ implementation:
           version=None,
           metadata=None
       ):
-          registry = ModelRegistry(registry_url, author=author, token=user_token)
+          registry = ModelRegistry.from_token(registry_url, token=user_token, author=author)
 
           if is_huggingface_model(uri_or_repo):
               return registry.register_huggingface_model(
