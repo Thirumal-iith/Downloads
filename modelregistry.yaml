@@ -30,7 +30,7 @@ implementation:
       - |
         import argparse, os, json
         from model_registry import ModelRegistry, utils
-        
+
         def infer_model_format(uri):
             ext = os.path.splitext(uri)[1].lower()
             return {
@@ -41,7 +41,7 @@ implementation:
                 ".h5": "keras",
                 ".sav": "sklearn"
             }.get(ext, "unknown")
-
+            
         def is_huggingface_model(uri_or_repo):
             return isinstance(uri_or_repo, str) and "/" in uri_or_repo and not uri_or_repo.startswith(("http", "s3://", "minio://", "/"))
 
