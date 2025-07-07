@@ -81,7 +81,6 @@ implementation:
             return registry.register_model(
                 model_name,
                 uri=uri_or_repo,
-                model_format=model_format,
                 description=description,
                 version=int(version),
                 storage_key=storage_key,
