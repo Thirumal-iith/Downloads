@@ -46,7 +46,8 @@ implementation:
             return isinstance(uri_or_repo, str) and "/" in uri_or_repo and not uri_or_repo.startswith(("http", "s3://", "minio://", "/"))
 
         def register_model_allinone(registry_url, model_name, uri_or_repo, user_token, author, storage_key, model_format, description, version, metadata):
-            registry = ModelRegistry(registry_url=registry_url, user_token=user_token, author=author)
+            registry = ModelRegistry.from_token(registry_url, token=user_token, author=author)
+
             if is_huggingface_model(uri_or_repo):
                 return registry.register_huggingface_model(
                     model_name,
@@ -55,10 +56,12 @@ implementation:
                     version=int(version),
                     metadata=metadata
                 )
+
             if not model_format:
                 model_format = infer_model_format(uri_or_repo)
                 if model_format == "unknown":
                     raise ValueError(f"Unknown model format for URI: {uri_or_repo}")
+
             if uri_or_repo.startswith("minio://"):
                 if not storage_key:
                     raise ValueError("Storage key required for MinIO URIs.")
