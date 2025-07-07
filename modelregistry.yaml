@@ -2,46 +2,21 @@ name: Register Model (All-in-One)
 description: Registers a model to the model registry from local path, URL, MinIO/S3 URI, or HuggingFace repo.
 
 inputs:
-  - name: registry_url
-    type: String
-  - name: model_name
-    type: String
-  - name: uri_or_repo
-    type: String
-  - name: user_token
-    type: String
-  - name: author
-    type: String
-    optional: true
-    default: ""
-  - name: storage_key
-    type: String
-    optional: true
-    default: ""
-  - name: model_format
-    type: String
-    optional: true
-    default: ""
-  - name: description
-    type: String
-    optional: true
-    default: "No description provided"
-  - name: version
-    type: Integer
-    optional: true
-    default: 1
-  - name: metadata
-    type: JsonObject
-    optional: true
-    default: {}
+  - {name: registry_url, type: String}
+  - {name: model_name, type: String}
+  - {name: uri_or_repo, type: String}
+  - {name: user_token, type: String}
+  - {name: author, type: String, optional: true, default: ""}
+  - {name: storage_key, type: String, optional: true, default: ""}
+  - {name: model_format, type: String, optional: true, default: ""}
+  - {name: description, type: String, optional: true, default: "No description provided"}
+  - {name: version, type: Integer, optional: true, default: 1}
+  - {name: metadata, type: JsonObject, optional: true, default: {}}
 
 outputs:
-  - name: model
-    type: JsonObject
-  - name: model_version
-    type: JsonObject
-  - name: model_artifacts
-    type: JsonObject
+  - {name: model, type: JsonObject}
+  - {name: model_version, type: JsonObject}
+  - {name: model_artifacts, type: JsonObject}
 
 implementation:
   container:
@@ -82,7 +57,8 @@ implementation:
             version=1,
             metadata=None
         ):
-            registry = ModelRegistry.from_token(registry_url, token=user_token, author=author)
+            registry = ModelRegistry(registry_url=registry_url, user_token=user_token, author=author)
+
             if is_huggingface_model(uri_or_repo):
                 return registry.register_huggingface_model(
                     model_name,
@@ -91,10 +67,12 @@ implementation:
                     version=version,
                     metadata=metadata or {}
                 )
+
             if not model_format:
                 model_format = infer_model_format(uri_or_repo)
                 if model_format == "unknown":
                     raise ValueError(f"Unknown model format for URI: {uri_or_repo}")
+
             if uri_or_repo.startswith("minio://"):
                 if not storage_key:
                     raise ValueError("Storage key required for MinIO URIs.")
@@ -103,6 +81,7 @@ implementation:
                 if not storage_key:
                     raise ValueError("Storage key required for S3 URIs.")
                 uri_or_repo = utils.s3_uri_from(uri_or_repo.replace("s3://", ""), storage_key)
+
             return registry.register_model(
                 model_name,
                 uri=uri_or_repo,
@@ -148,15 +127,14 @@ implementation:
         )
 
         os.makedirs(os.path.dirname(args.model), exist_ok=True)
-        os.makedirs(os.path.dirname(args.model_version), exist_ok=True)
-        os.makedirs(os.path.dirname(args.model_artifacts), exist_ok=True)
-
         with open(args.model, "w") as f:
             json.dump({"model": result.get("model") if isinstance(result, dict) else result.model}, f)
 
+        os.makedirs(os.path.dirname(args.model_version), exist_ok=True)
         with open(args.model_version, "w") as f:
             json.dump({"model_version": result.get("model_version") if isinstance(result, dict) else result.version}, f)
 
+        os.makedirs(os.path.dirname(args.model_artifacts), exist_ok=True)
         with open(args.model_artifacts, "w") as f:
             json.dump({"model_artifacts": result.get("model_artifacts") if isinstance(result, dict) else result.artifacts}, f)
 
