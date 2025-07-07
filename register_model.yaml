@@ -129,7 +129,7 @@ implementation:
           version=args.version,
           metadata=metadata
       )
-
+      
       # Ensure output paths exist
       os.makedirs(os.path.dirname(args.model), exist_ok=True)
       os.makedirs(os.path.dirname(args.model_version), exist_ok=True)
