@@ -25,7 +25,7 @@ implementation:
     - sh
     - -c
     - |
-      pip install --quiet model-registry
+      pip install --pre model-registry=="0.2.3a1"
       python3 -u -c "$0" "$@"
     - |
       import argparse
@@ -63,7 +63,7 @@ implementation:
           version=None,
           metadata=None
       ):
-          registry = ModelRegistry(registry_url, author=author, token=False)
+          registry = ModelRegistry(registry_url, author=author, token=user_token)
 
           if is_huggingface_model(uri_or_repo):
               return registry.register_huggingface_model(
