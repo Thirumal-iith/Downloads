@@ -5,6 +5,7 @@ inputs:
   - {name: registry_url, type: String}
   - {name: model_name, type: String}
   - {name: uri_or_repo, type: String}
+  - {name: user_token, type: String}
   - {name: author, type: String, optional: true}
   - {name: storage_key, type: String, optional: true}
   - {name: model_format, type: String, optional: true}
@@ -54,6 +55,7 @@ implementation:
           registry_url,
           model_name,
           uri_or_repo,
+          user_token,
           author=None,
           storage_key=None,
           model_format=None,
@@ -61,7 +63,7 @@ implementation:
           version=None,
           metadata=None
       ):
-          registry = ModelRegistry(registry_url, author=author)
+          registry = ModelRegistry(registry_url, author=author, token=user_token)
 
           if is_huggingface_model(uri_or_repo):
               return registry.register_huggingface_model(
@@ -100,6 +102,7 @@ implementation:
       parser.add_argument("--registry_url", type=str, required=True)
       parser.add_argument("--model_name", type=str, required=True)
       parser.add_argument("--uri_or_repo", type=str, required=True)
+      parser.add_argument("--user_token", type=str, required=True)
       parser.add_argument("--author", type=str)
       parser.add_argument("--storage_key", type=str)
       parser.add_argument("--model_format", type=str)
@@ -112,7 +115,6 @@ implementation:
 
       args = parser.parse_args()
 
-      # Safely parse metadata
       try:
           metadata = json.loads(args.metadata) if args.metadata else None
       except json.JSONDecodeError:
@@ -122,6 +124,7 @@ implementation:
           registry_url=args.registry_url,
           model_name=args.model_name,
           uri_or_repo=args.uri_or_repo,
+          user_token=args.user_token,
           author=args.author,
           storage_key=args.storage_key,
           model_format=args.model_format,
@@ -129,13 +132,11 @@ implementation:
           version=args.version,
           metadata=metadata
       )
-      
-      # Ensure output paths exist
+
       os.makedirs(os.path.dirname(args.model), exist_ok=True)
       os.makedirs(os.path.dirname(args.model_version), exist_ok=True)
       os.makedirs(os.path.dirname(args.model_artifacts), exist_ok=True)
 
-      # Write outputs
       with open(args.model, "w") as f:
           json.dump({"model": result.get("model") if isinstance(result, dict) else result.model}, f)
 
@@ -151,6 +152,8 @@ implementation:
     - {inputValue: model_name}
     - --uri_or_repo
     - {inputValue: uri_or_repo}
+    - --user_token
+    - {inputValue: user_token}
     - --author
     - {inputValue: author}
     - --storage_key
