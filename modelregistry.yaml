@@ -30,7 +30,7 @@ implementation:
       - |
         import argparse, os, json
         from model_registry import ModelRegistry, utils
-
+        
         def infer_model_format(uri):
             ext = os.path.splitext(uri)[1].lower()
             return {
