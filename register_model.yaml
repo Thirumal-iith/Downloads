@@ -47,9 +47,7 @@ implementation:
         pip install --pre model-registry==0.2.3a1
         python3 -u -c "$0" "$@"
       - |
-        import argparse
-        import os
-        import json
+        import argparse, os, json
         from model_registry import ModelRegistry, utils
 
         def infer_model_format(uri):
@@ -64,11 +62,7 @@ implementation:
             }.get(ext, "unknown")
 
         def is_huggingface_model(uri_or_repo):
-            return (
-                isinstance(uri_or_repo, str)
-                and "/" in uri_or_repo
-                and not uri_or_repo.startswith(("http", "s3://", "minio://", "/"))
-            )
+            return isinstance(uri_or_repo, str) and "/" in uri_or_repo and not uri_or_repo.startswith(("http", "s3://", "minio://", "/"))
 
         def register_model_allinone(
             registry_url,
@@ -83,21 +77,18 @@ implementation:
             metadata=None
         ):
             registry = ModelRegistry.from_token(registry_url, token=user_token, author=author)
-
             if is_huggingface_model(uri_or_repo):
                 return registry.register_huggingface_model(
                     model_name,
                     repo_id=uri_or_repo,
-                    description=description,
+                    description=description or "No description provided",
                     version=version,
                     metadata=metadata or {}
                 )
-
             if not model_format:
                 model_format = infer_model_format(uri_or_repo)
                 if model_format == "unknown":
                     raise ValueError(f"Unknown model format for URI: {uri_or_repo}")
-
             if uri_or_repo.startswith("minio://"):
                 if not storage_key:
                     raise ValueError("Storage key required for MinIO URIs.")
@@ -106,32 +97,30 @@ implementation:
                 if not storage_key:
                     raise ValueError("Storage key required for S3 URIs.")
                 uri_or_repo = utils.s3_uri_from(uri_or_repo.replace("s3://", ""), storage_key)
-
             return registry.register_model(
                 model_name,
                 uri=uri_or_repo,
                 model_format=model_format,
-                description=description,
+                description=description or "No description provided",
                 version=version,
                 storage_key=storage_key,
                 metadata=metadata or {}
             )
 
         parser = argparse.ArgumentParser()
-        parser.add_argument("--registry_url", type=str, required=True)
-        parser.add_argument("--model_name", type=str, required=True)
-        parser.add_argument("--uri_or_repo", type=str, required=True)
-        parser.add_argument("--user_token", type=str, required=True)
-        parser.add_argument("--author", type=str)
-        parser.add_argument("--storage_key", type=str)
-        parser.add_argument("--model_format", type=str)
-        parser.add_argument("--description", type=str)
-        parser.add_argument("--version", type=int)
-        parser.add_argument("--metadata", type=str)
-        parser.add_argument("--model", type=str)
-        parser.add_argument("--model_version", type=str)
-        parser.add_argument("--model_artifacts", type=str)
-
+        parser.add_argument("--registry_url", required=True)
+        parser.add_argument("--model_name", required=True)
+        parser.add_argument("--uri_or_repo", required=True)
+        parser.add_argument("--user_token", required=True)
+        parser.add_argument("--author")
+        parser.add_argument("--storage_key")
+        parser.add_argument("--model_format")
+        parser.add_argument("--description")
+        parser.add_argument("--version", type=float)
+        parser.add_argument("--metadata")
+        parser.add_argument("--model")
+        parser.add_argument("--model_version")
+        parser.add_argument("--model_artifacts")
         args = parser.parse_args()
 
         try:
