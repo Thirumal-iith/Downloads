@@ -87,7 +87,7 @@ implementation:
                 model_format_version="1",
                 storage_key=storage_key,
                 metadata=metadata
-            )
+            ) 
 
         parser = argparse.ArgumentParser()
         parser.add_argument("--registry_url", required=True)
