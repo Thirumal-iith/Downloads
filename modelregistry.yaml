@@ -80,10 +80,10 @@ implementation:
 
             return registry.register_model(
                 model_name,
-                uri=uri_or_repo,
+                uri_or_repo,
                 description=description,
                 version=int(version),
-                model_format_name=infer_model_format(uri),
+                model_format_name=infer_model_format(uri_or_repo),
                 model_format_version="1",
                 storage_key=storage_key,
                 metadata=metadata
