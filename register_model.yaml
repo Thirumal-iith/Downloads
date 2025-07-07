@@ -111,7 +111,12 @@ implementation:
       parser.add_argument("--model_artifacts", type=str)
 
       args = parser.parse_args()
-      metadata = json.loads(args.metadata) if args.metadata else None
+
+      # Safely parse metadata
+      try:
+          metadata = json.loads(args.metadata) if args.metadata else None
+      except json.JSONDecodeError:
+          metadata = None
 
       result = register_model_allinone(
           registry_url=args.registry_url,
@@ -125,7 +130,12 @@ implementation:
           metadata=metadata
       )
 
-      # Write each output as valid JSON
+      # Ensure output paths exist
+      os.makedirs(os.path.dirname(args.model), exist_ok=True)
+      os.makedirs(os.path.dirname(args.model_version), exist_ok=True)
+      os.makedirs(os.path.dirname(args.model_artifacts), exist_ok=True)
+
+      # Write outputs
       with open(args.model, "w") as f:
           json.dump({"model": result.get("model") if isinstance(result, dict) else result.model}, f)
 
