@@ -25,7 +25,7 @@ implementation:
       - sh
       - -c
       - |
-        pip install --pre model-registry==0.2.20
+        pip install --pre model-registry==0.2.3a1
         python3 -u -c "$0" "$@"
       - |
         import argparse, os, json
@@ -47,18 +47,13 @@ implementation:
             return isinstance(uri_or_repo, str) and "/" in uri_or_repo and not uri_or_repo.startswith(("http", "s3://", "minio://", "/"))
 
         def register_model_allinone(registry_url, model_name, uri_or_repo, user_token, author, storage_key, model_format, description, version, metadata):
+            # Parse registry_url like http://server-address:8080
             parsed = urlparse(registry_url)
-            host = parsed.hostname or "localhost"
-            port = parsed.port or 80
+            host = f"{parsed.scheme}://{parsed.hostname}"
+            port = parsed.port or (443 if parsed.scheme == "https" else 80)
             is_secure = parsed.scheme == "https"
 
-            registry = ModelRegistry(
-                server_address=host,
-                port=port,
-                author=author or "",
-                is_secure=is_secure
-            )
-            registry.authenticate(user_token)
+            registry = ModelRegistry(host, port, author=author or "Anonymous", is_secure=is_secure)
 
             if is_huggingface_model(uri_or_repo):
                 return registry.register_huggingface_model(
@@ -111,7 +106,7 @@ implementation:
 
         try:
             metadata = json.loads(args.metadata) if args.metadata else {}
-        except Exception as e:
+        except Exception:
             metadata = {}
 
         result = register_model_allinone(
@@ -151,11 +146,4 @@ implementation:
       - {inputValue: description}
       - --version
       - {inputValue: version}
-      - --metadata
-      - {inputValue: metadata}
-      - --model
-      - {outputPath: model}
-      - --model_version
-      - {outputPath: model_version}
-      - --model_artifacts
-      - {outputPath: model_artifacts}
+      - --metada
