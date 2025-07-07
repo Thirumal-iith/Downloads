@@ -146,4 +146,11 @@ implementation:
       - {inputValue: description}
       - --version
       - {inputValue: version}
-      - --metada
+      - --metadata
+      - {inputValue: metadata}
+      - --model
+      - {outputPath: model}
+      - --model_version
+      - {outputPath: model_version}
+      - --model_artifacts
+      - {outputPath: model_artifacts}
