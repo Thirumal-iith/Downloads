@@ -2,181 +2,159 @@ name: Register Model (All-in-One)
 description: Registers a model to the model registry from local path, URL, MinIO/S3 URI, or HuggingFace repo.
 
 inputs:
-
-{name: registry_url, type: String}
-
-{name: model_name, type: String}
-
-{name: uri_or_repo, type: String}
-
-{name: user_token, type: String}
-
-{name: author, type: String, optional: true, default: ""}
-
-{name: storage_key, type: String, optional: true, default: ""}
-
-{name: model_format, type: String, optional: true, default: ""}
-
-{name: description, type: String, optional: true, default: "No description provided"}
-
-{name: version, type: String, optional: true, default: "1"}
-
-{name: metadata, type: String, optional: true, default: "{}"}
-
+  - {name: model_name, type: String}
+  - {name: uri_or_repo, type: String}
+  - {name: user_token, type: String}
+  - {name: author, type: String, optional: true, default: ""}
+  - {name: storage_key, type: String, optional: true, default: ""}
+  - {name: model_format, type: String, optional: true, default: ""}
+  - {name: description, type: String, optional: true, default: "No description provided"}
+  - {name: version, type: String, optional: true, default: "1"}
+  - {name: metadata, type: String, optional: true, default: "{}"}
 
 outputs:
+  - {name: model, type: String}
+  - {name: model_version, type: String}
+  - {name: model_artifacts, type: String}
 
-{name: model, type: String}
+implementation:
+  container:
+    image: python:3.10
+    command:
+      - sh
+      - -c
+      - |
+        pip install --pre model-registry==0.2.20
+        python3 -u -c "$0" "$@"
+      - |
+        import argparse, os, json
+        from urllib.parse import urlparse
+        from model_registry import ModelRegistry, utils
 
-{name: model_version, type: String}
+        def infer_model_format(uri):
+            ext = os.path.splitext(uri)[1].lower()
+            return {
+                ".onnx": "onnx",
+                ".pkl": "sklearn",
+                ".pt": "pytorch",
+                ".joblib": "sklearn",
+                ".h5": "keras",
+                ".sav": "sklearn"
+            }.get(ext, "unknown")
 
-{name: model_artifacts, type: String}
+        def is_huggingface_model(uri_or_repo):
+            return isinstance(uri_or_repo, str) and "/" in uri_or_repo and not uri_or_repo.startswith(("http", "s3://", "minio://", "/"))
 
+        def register_model_allinone(model_name, uri_or_repo, user_token, author, storage_key, model_format, description, version, metadata):
+            if not user_token:
+                raise ValueError("User token is required for secure connection.")
 
-implementation: container: image: python:3.10 command: - sh - -c - | pip install --pre model-registry==0.2.20 python3 -u -c "$0" "$@" - | import argparse, os, json from urllib.parse import urlparse from model_registry import ModelRegistry, utils
+            base_url = "http://model-registry-service.kubeflow.svc.cluster.local:8080"
+            is_secure = False
 
-def infer_model_format(uri):
-        ext = os.path.splitext(uri)[1].lower()
-        return {
-            ".onnx": "onnx",
-            ".pkl": "sklearn",
-            ".pt": "pytorch",
-            ".joblib": "sklearn",
-            ".h5": "keras",
-            ".sav": "sklearn"
-        }.get(ext, "unknown")
+            registry = ModelRegistry(
+                server_address=base_url,
+                author=author or "Anonymous",
+                is_secure=is_secure,
+                user_token=user_token
+            )
 
-    def is_huggingface_model(uri_or_repo):
-        return isinstance(uri_or_repo, str) and "/" in uri_or_repo and not uri_or_repo.startswith(("http", "s3://", "minio://", "/"))
+            version_int = int(version)
 
-    def parse_registry_url(url):
-        parsed = urlparse(url)
-        scheme = parsed.scheme or "http"
-        hostname = parsed.hostname
-        port = parsed.port
-        is_secure = scheme == "https"
+            if is_huggingface_model(uri_or_repo):
+                return registry.register_huggingface_model(
+                    model_name,
+                    repo_id=uri_or_repo,
+                    description=description,
+                    version=version_int,
+                    metadata=metadata
+                )
 
-        if not hostname:
-            raise ValueError("Invalid registry URL — missing hostname.")
+            if not model_format:
+                model_format = infer_model_format(uri_or_repo)
+                if model_format == "unknown":
+                    raise ValueError(f"Unknown model format for URI: {uri_or_repo}")
 
-        base_url = f"{scheme}://{hostname}"
-        if port:
-            base_url += f":{port}"
+            if uri_or_repo.startswith("minio://"):
+                if not storage_key:
+                    raise ValueError("Storage key required for MinIO URIs.")
+                uri_or_repo = utils.s3_uri_from(uri_or_repo.replace("minio://", ""), storage_key)
+            elif uri_or_repo.startswith("s3://"):
+                if not storage_key:
+                    raise ValueError("Storage key required for S3 URIs.")
+                uri_or_repo = utils.s3_uri_from(uri_or_repo.replace("s3://", ""), storage_key)
 
-        return base_url.rstrip("/"), is_secure
-
-    def register_model_allinone(registry_url, model_name, uri_or_repo, user_token, author, storage_key, model_format, description, version, metadata):
-        if not user_token:
-            raise ValueError("User token is required for secure connection.")
-
-        base_url, is_secure = parse_registry_url(registry_url)
-
-        registry = ModelRegistry(
-            server_address=base_url,
-            author=author or "Anonymous",
-            is_secure=is_secure,
-            user_token=user_token
-        )
-
-        version_int = int(version)
-
-        if is_huggingface_model(uri_or_repo):
-            return registry.register_huggingface_model(
+            return registry.register_model(
                 model_name,
-                repo_id=uri_or_repo,
+                uri=uri_or_repo,
                 description=description,
                 version=version_int,
+                model_format_name=model_format,
+                model_format_version="1",
+                storage_key=storage_key,
                 metadata=metadata
             )
 
-        if not model_format:
-            model_format = infer_model_format(uri_or_repo)
-            if model_format == "unknown":
-                raise ValueError(f"Unknown model format for URI: {uri_or_repo}")
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--model_name", required=True)
+        parser.add_argument("--uri_or_repo", required=True)
+        parser.add_argument("--user_token", required=True)
+        parser.add_argument("--author")
+        parser.add_argument("--storage_key")
+        parser.add_argument("--model_format")
+        parser.add_argument("--description")
+        parser.add_argument("--version")
+        parser.add_argument("--metadata")
+        parser.add_argument("--model")
+        parser.add_argument("--model_version")
+        parser.add_argument("--model_artifacts")
+        args = parser.parse_args()
 
-        if uri_or_repo.startswith("minio://"):
-            if not storage_key:
-                raise ValueError("Storage key required for MinIO URIs.")
-            uri_or_repo = utils.s3_uri_from(uri_or_repo.replace("minio://", ""), storage_key)
-        elif uri_or_repo.startswith("s3://"):
-            if not storage_key:
-                raise ValueError("Storage key required for S3 URIs.")
-            uri_or_repo = utils.s3_uri_from(uri_or_repo.replace("s3://", ""), storage_key)
+        try:
+            metadata = json.loads(args.metadata) if args.metadata else {}
+        except Exception:
+            metadata = {}
 
-        return registry.register_model(
-            model_name,
-            uri=uri_or_repo,
-            description=description,
-            version=version_int,
-            model_format_name=model_format,
-            model_format_version="1",
-            storage_key=storage_key,
-            metadata=metadata
+        result = register_model_allinone(
+            args.model_name, args.uri_or_repo,
+            args.user_token, args.author, args.storage_key, args.model_format,
+            args.description, args.version, metadata
         )
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--registry_url", required=True)
-    parser.add_argument("--model_name", required=True)
-    parser.add_argument("--uri_or_repo", required=True)
-    parser.add_argument("--user_token", required=True)
-    parser.add_argument("--author")
-    parser.add_argument("--storage_key")
-    parser.add_argument("--model_format")
-    parser.add_argument("--description")
-    parser.add_argument("--version")
-    parser.add_argument("--metadata")
-    parser.add_argument("--model")
-    parser.add_argument("--model_version")
-    parser.add_argument("--model_artifacts")
-    args = parser.parse_args()
+        os.makedirs(os.path.dirname(args.model), exist_ok=True)
+        with open(args.model, "w") as f:
+            json.dump({"model": result.get("model") if isinstance(result, dict) else result.model}, f)
 
-    try:
-        metadata = json.loads(args.metadata) if args.metadata else {}
-    except Exception:
-        metadata = {}
+        os.makedirs(os.path.dirname(args.model_version), exist_ok=True)
+        with open(args.model_version, "w") as f:
+            json.dump({"model_version": result.get("model_version") if isinstance(result, dict) else result.version}, f)
 
-    result = register_model_allinone(
-        args.registry_url, args.model_name, args.uri_or_repo,
-        args.user_token, args.author, args.storage_key, args.model_format,
-        args.description, args.version, metadata
-    )
+        os.makedirs(os.path.dirname(args.model_artifacts), exist_ok=True)
+        with open(args.model_artifacts, "w") as f:
+            json.dump({"model_artifacts": result.get("model_artifacts") if isinstance(result, dict) else result.artifacts}, f)
 
-    os.makedirs(os.path.dirname(args.model), exist_ok=True)
-    with open(args.model, "w") as f:
-        json.dump({"model": result.get("model") if isinstance(result, dict) else result.model}, f)
-
-    os.makedirs(os.path.dirname(args.model_version), exist_ok=True)
-    with open(args.model_version, "w") as f:
-        json.dump({"model_version": result.get("model_version") if isinstance(result, dict) else result.version}, f)
-
-    os.makedirs(os.path.dirname(args.model_artifacts), exist_ok=True)
-    with open(args.model_artifacts, "w") as f:
-        json.dump({"model_artifacts": result.get("model_artifacts") if isinstance(result, dict) else result.artifacts}, f)
-
-args:
-  - --registry_url
-  - {inputValue: registry_url}
-  - --model_name
-  - {inputValue: model_name}
-  - --uri_or_repo
-  - {inputValue: uri_or_repo}
-  - --user_token
-  - {inputValue: user_token}
-  - --author
-  - {inputValue: author}
-  - --storage_key
-  - {inputValue: storage_key}
-  - --model_format
-  - {inputValue: model_format}
-  - --description
-  - {inputValue: description}
-  - --version
-  - {inputValue: version}
-  - --metadata
-  - {inputValue: metadata}
-  - --model
-  - {outputPath: model}
-  - --model_version
-  - {outputPath: model_version}
-  - --model_artifacts
-  - {outputPath: model_artifacts}
+    args:
+      - --model_name
+      - {inputValue: model_name}
+      - --uri_or_repo
+      - {inputValue: uri_or_repo}
+      - --user_token
+      - {inputValue: user_token}
+      - --author
+      - {inputValue: author}
+      - --storage_key
+      - {inputValue: storage_key}
+      - --model_format
+      - {inputValue: model_format}
+      - --description
+      - {inputValue: description}
+      - --version
+      - {inputValue: version}
+      - --metadata
+      - {inputValue: metadata}
+      - --model
+      - {outputPath: model}
+      - --model_version
+      - {outputPath: model_version}
+      - --model_artifacts
+      - {outputPath: model_artifacts}
