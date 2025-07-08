@@ -50,13 +50,7 @@ implementation:
             parsed = urlparse(url)
             scheme = parsed.scheme or "http"
             hostname = parsed.hostname or "localhost"
-            try:
-                port = parsed.port
-            except ValueError:
-                # Handle invalid port like 8080:443
-                port = 443 if scheme == "https" else 80
-            if not port:
-                port = 443 if scheme == "https" else 80
+            port = parsed.port or (443 if scheme == "https" else 80)
             return f"{scheme}://{hostname}:{port}", scheme == "https"
 
         def register_model_allinone(registry_url, model_name, uri_or_repo, user_token, author, storage_key, model_format, description, version, metadata):
@@ -70,8 +64,8 @@ implementation:
                 author=author or "Anonymous",
                 is_secure=is_secure
             )
-            registry.authenticate(user_token)
 
+            version_str = str(version)
             version_int = int(version)
 
             if is_huggingface_model(uri_or_repo):
