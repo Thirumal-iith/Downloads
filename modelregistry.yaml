@@ -51,11 +51,8 @@ implementation:
             scheme = parsed.scheme or "http"
             hostname = parsed.hostname or parsed.path.split(':')[0] or "localhost"
             raw_netloc = parsed.netloc or parsed.path
-
-            # Extract first valid port number from malformed strings like :8080:443
             port_match = re.findall(r":(\d+)", raw_netloc)
             port = int(port_match[0]) if port_match else (443 if scheme == "https" else 80)
-
             base_url = f"{scheme}://{hostname}:{port}".rstrip('/')
             return base_url, scheme == "https"
 
@@ -68,11 +65,10 @@ implementation:
             registry = ModelRegistry(
                 server_address=base_url,
                 author=author or "Anonymous",
-                is_secure=is_secure
+                is_secure=is_secure,
+                user_token=user_token  #  FIXED
             )
-            registry.authenticate(user_token)
 
-            version_str = str(version)
             version_int = int(version)
 
             if is_huggingface_model(uri_or_repo):
