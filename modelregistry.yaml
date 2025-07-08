@@ -47,7 +47,6 @@ implementation:
             return isinstance(uri_or_repo, str) and "/" in uri_or_repo and not uri_or_repo.startswith(("http", "s3://", "minio://", "/"))
 
         def register_model_allinone(registry_url, model_name, uri_or_repo, user_token, author, storage_key, model_format, description, version, metadata):
-            # Parse registry_url like http://server-address:8080
             parsed = urlparse(registry_url)
             host = f"{parsed.scheme}://{parsed.hostname}"
             port = parsed.port or (443 if parsed.scheme == "https" else 80)
@@ -55,12 +54,16 @@ implementation:
 
             registry = ModelRegistry(host, port, author=author or "Anonymous", is_secure=is_secure)
 
+            # FIX: Separate version_str (for name) and version_int (for versioning)
+            version_str = str(version)
+            version_int = int(version)
+
             if is_huggingface_model(uri_or_repo):
                 return registry.register_huggingface_model(
                     model_name,
                     repo_id=uri_or_repo,
                     description=description,
-                    version=int(version),
+                    version=version_int,
                     metadata=metadata
                 )
 
@@ -82,12 +85,12 @@ implementation:
                 model_name,
                 uri_or_repo,
                 description=description,
-                version=int(version),
-                model_format_name=infer_model_format(uri_or_repo),
+                version=version_int,
+                model_format_name=model_format,
                 model_format_version="1",
                 storage_key=storage_key,
                 metadata=metadata
-            ) 
+            )
 
         parser = argparse.ArgumentParser()
         parser.add_argument("--registry_url", required=True)
