@@ -28,7 +28,7 @@ implementation:
         pip install --pre model-registry==0.2.20
         python3 -u -c "$0" "$@"
       - |
-        import argparse, os, json
+        import argparse, os, json, re
         from urllib.parse import urlparse
         from model_registry import ModelRegistry, utils
 
@@ -46,33 +46,31 @@ implementation:
         def is_huggingface_model(uri_or_repo):
             return isinstance(uri_or_repo, str) and "/" in uri_or_repo and not uri_or_repo.startswith(("http", "s3://", "minio://", "/"))
 
-        def prepare_registry_url(url):
-            """Ensure the registry URL is properly formatted without duplicate ports"""
-            if url.endswith('/'):
-                url = url[:-1]
-            # If URL already has a port, use it as-is
-            if ':' in url.split('//')[-1]:
-                return url
-            # Otherwise add default port based on scheme
+        def parse_registry_url(url):
             parsed = urlparse(url)
             scheme = parsed.scheme or "http"
-            default_port = 443 if scheme == "https" else 80
-            return f"{scheme}://{parsed.netloc or parsed.path}:{default_port}"
+            hostname = parsed.hostname or parsed.path.split(':')[0] or "localhost"
+            raw_netloc = parsed.netloc or parsed.path
+
+            # Extract first valid port number from malformed strings like :8080:443
+            port_match = re.findall(r":(\d+)", raw_netloc)
+            port = int(port_match[0]) if port_match else (443 if scheme == "https" else 80)
+
+            base_url = f"{scheme}://{hostname}:{port}".rstrip('/')
+            return base_url, scheme == "https"
 
         def register_model_allinone(registry_url, model_name, uri_or_repo, user_token, author, storage_key, model_format, description, version, metadata):
             if not user_token:
                 raise ValueError("User token is required for secure connection.")
 
-            # Clean and prepare the registry URL
-            base_url = prepare_registry_url(registry_url)
-            
-            # The ModelRegistry client seems to add :443 by default, so we need to prevent that
-            # by ensuring our URL already has the correct port
+            base_url, is_secure = parse_registry_url(registry_url)
+
             registry = ModelRegistry(
                 server_address=base_url,
                 author=author or "Anonymous",
-                is_secure=base_url.startswith("https://")
+                is_secure=is_secure
             )
+            registry.authenticate(user_token)
 
             version_str = str(version)
             version_int = int(version)
