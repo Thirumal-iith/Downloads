@@ -49,9 +49,11 @@ implementation:
         def parse_registry_url(url):
             parsed = urlparse(url)
             scheme = parsed.scheme or "http"
-            hostname = parsed.hostname or "localhost"
+            hostname = parsed.hostname or parsed.path.split(':')[0] or "localhost"
             port = parsed.port or (443 if scheme == "https" else 80)
-            return f"{scheme}://{hostname}:{port}", scheme == "https"
+            # Remove any trailing slashes and build the base URL
+            base_url = f"{scheme}://{hostname}:{port}".rstrip('/')
+            return base_url, scheme == "https"
 
         def register_model_allinone(registry_url, model_name, uri_or_repo, user_token, author, storage_key, model_format, description, version, metadata):
             if not user_token:
