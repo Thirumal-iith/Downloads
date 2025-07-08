@@ -46,25 +46,32 @@ implementation:
         def is_huggingface_model(uri_or_repo):
             return isinstance(uri_or_repo, str) and "/" in uri_or_repo and not uri_or_repo.startswith(("http", "s3://", "minio://", "/"))
 
-        def parse_registry_url(url):
+        def prepare_registry_url(url):
+            """Ensure the registry URL is properly formatted without duplicate ports"""
+            if url.endswith('/'):
+                url = url[:-1]
+            # If URL already has a port, use it as-is
+            if ':' in url.split('//')[-1]:
+                return url
+            # Otherwise add default port based on scheme
             parsed = urlparse(url)
             scheme = parsed.scheme or "http"
-            hostname = parsed.hostname or parsed.path.split(':')[0] or "localhost"
-            port = parsed.port or (443 if scheme == "https" else 80)
-            # Remove any trailing slashes and build the base URL
-            base_url = f"{scheme}://{hostname}:{port}".rstrip('/')
-            return base_url, scheme == "https"
+            default_port = 443 if scheme == "https" else 80
+            return f"{scheme}://{parsed.netloc or parsed.path}:{default_port}"
 
         def register_model_allinone(registry_url, model_name, uri_or_repo, user_token, author, storage_key, model_format, description, version, metadata):
             if not user_token:
                 raise ValueError("User token is required for secure connection.")
 
-            base_url, is_secure = parse_registry_url(registry_url)
-
+            # Clean and prepare the registry URL
+            base_url = prepare_registry_url(registry_url)
+            
+            # The ModelRegistry client seems to add :443 by default, so we need to prevent that
+            # by ensuring our URL already has the correct port
             registry = ModelRegistry(
                 server_address=base_url,
                 author=author or "Anonymous",
-                is_secure=is_secure
+                is_secure=base_url.startswith("https://")
             )
 
             version_str = str(version)
