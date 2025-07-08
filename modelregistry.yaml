@@ -56,7 +56,6 @@ implementation:
             if not hostname:
                 raise ValueError("Invalid registry URL — missing hostname.")
 
-            # Only append port if present
             base_url = f"{scheme}://{hostname}"
             if port:
                 base_url += f":{port}"
@@ -151,30 +150,30 @@ implementation:
         with open(args.model_artifacts, "w") as f:
             json.dump({"model_artifacts": result.get("model_artifacts") if isinstance(result, dict) else result.artifacts}, f)
 
-    args:
-      - --registry_url
-      - {inputValue: registry_url}
-      - --model_name
-      - {inputValue: model_name}
-      - --uri_or_repo
-      - {inputValue: uri_or_repo}
-      - --user_token
-      - {inputValue: user_token}
-      - --author
-      - {inputValue: author}
-      - --storage_key
-      - {inputValue: storage_key}
-      - --model_format
-      - {inputValue: model_format}
-      - --description
-      - {inputValue: description}
-      - --version
-      - {inputValue: version}
-      - --metadata
-      - {inputValue: metadata}
-      - --model
-      - {outputPath: model}
-      - --model_version
-      - {outputPath: model_version}
-      - --model_artifacts
-      - {outputPath: model_artifacts}
+args:
+  - --registry_url
+  - {inputValue: registry_url}
+  - --model_name
+  - {inputValue: model_name}
+  - --uri_or_repo
+  - {inputValue: uri_or_repo}
+  - --user_token
+  - {inputValue: user_token}
+  - --author
+  - {inputValue: author}
+  - --storage_key
+  - {inputValue: storage_key}
+  - --model_format
+  - {inputValue: model_format}
+  - --description
+  - {inputValue: description}
+  - --version
+  - {inputValue: version}
+  - --metadata
+  - {inputValue: metadata}
+  - --model
+  - {outputPath: model}
+  - --model_version
+  - {outputPath: model_version}
+  - --model_artifacts
+  - {outputPath: model_artifacts}
