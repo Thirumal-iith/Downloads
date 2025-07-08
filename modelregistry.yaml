@@ -28,7 +28,7 @@ implementation:
         pip install --pre model-registry==0.2.20
         python3 -u -c "$0" "$@"
       - |
-        import argparse, os, json, re
+        import argparse, os, json
         from urllib.parse import urlparse
         from model_registry import ModelRegistry, utils
 
@@ -49,10 +49,8 @@ implementation:
         def parse_registry_url(url):
             parsed = urlparse(url)
             scheme = parsed.scheme or "http"
-            hostname = parsed.hostname or parsed.path.split(':')[0] or "localhost"
-            raw_netloc = parsed.netloc or parsed.path
-            port_match = re.findall(r":(\d+)", raw_netloc)
-            port = int(port_match[0]) if port_match else (443 if scheme == "https" else 80)
+            hostname = parsed.hostname or "localhost"
+            port = parsed.port or (443 if scheme == "https" else 80)
             base_url = f"{scheme}://{hostname}:{port}".rstrip('/')
             return base_url, scheme == "https"
 
@@ -66,7 +64,7 @@ implementation:
                 server_address=base_url,
                 author=author or "Anonymous",
                 is_secure=is_secure,
-                user_token=user_token  #  FIXED
+                user_token=user_token
             )
 
             version_int = int(version)
