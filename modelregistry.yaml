@@ -46,21 +46,24 @@ implementation:
         def is_huggingface_model(uri_or_repo):
             return isinstance(uri_or_repo, str) and "/" in uri_or_repo and not uri_or_repo.startswith(("http", "s3://", "minio://", "/"))
 
+        def parse_registry_url(url):
+            parsed = urlparse(url)
+            scheme = parsed.scheme or "http"
+            hostname = parsed.hostname or "localhost"
+            port = parsed.port or (443 if scheme == "https" else 80)
+            return f"{scheme}://{hostname}:{port}", scheme == "https"
+
         def register_model_allinone(registry_url, model_name, uri_or_repo, user_token, author, storage_key, model_format, description, version, metadata):
-            parsed = urlparse(registry_url)
-            host = parsed.hostname or "localhost"
-            port = parsed.port or (443 if parsed.scheme == "https" else 80)
-            is_secure = parsed.scheme == "https"
-            base_url = f"{parsed.scheme}://{host}:{port}"
+            if not user_token:
+                raise ValueError("User token is required for secure connection.")
+
+            base_url, is_secure = parse_registry_url(registry_url)
 
             registry = ModelRegistry(
                 server_address=base_url,
                 author=author or "Anonymous",
                 is_secure=is_secure
             )
-
-            if not user_token:
-                raise ValueError("User token is required but not provided.")
             registry.authenticate(user_token)
 
             version_str = str(version)
@@ -90,7 +93,7 @@ implementation:
                 uri_or_repo = utils.s3_uri_from(uri_or_repo.replace("s3://", ""), storage_key)
 
             return registry.register_model(
-                model_name=model_name,
+                model_name,
                 uri=uri_or_repo,
                 description=description,
                 version=version_int,
