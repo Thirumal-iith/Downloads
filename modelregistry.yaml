@@ -49,10 +49,19 @@ implementation:
         def parse_registry_url(url):
             parsed = urlparse(url)
             scheme = parsed.scheme or "http"
-            hostname = parsed.hostname or "localhost"
-            port = parsed.port or (443 if scheme == "https" else 80)
-            base_url = f"{scheme}://{hostname}:{port}".rstrip('/')
-            return base_url, scheme == "https"
+            hostname = parsed.hostname
+            port = parsed.port
+            is_secure = scheme == "https"
+
+            if not hostname:
+                raise ValueError("Invalid registry URL — missing hostname.")
+
+            # Only append port if present
+            base_url = f"{scheme}://{hostname}"
+            if port:
+                base_url += f":{port}"
+
+            return base_url.rstrip("/"), is_secure
 
         def register_model_allinone(registry_url, model_name, uri_or_repo, user_token, author, storage_key, model_format, description, version, metadata):
             if not user_token:
