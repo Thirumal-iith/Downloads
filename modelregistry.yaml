@@ -59,8 +59,7 @@ implementation:
                 server_address=base_url,
                 8080,
                 author=author or "Anonymous",
-                is_secure=is_secure,
-                user_token=user_token
+                is_secure=is_secure
             )
 
             version_int = int(version)
