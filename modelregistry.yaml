@@ -49,7 +49,7 @@ implementation:
             if not user_token:
                 raise ValueError("User token is required for secure connection.")
 
-            base_url = "http://model-registry-service.kubeflow.svc.cluster.local:8080"
+            base_url = "http://model-registry-service.kubeflow.svc.cluster.local:9080"
             is_secure = False
 
             registry = ModelRegistry(
