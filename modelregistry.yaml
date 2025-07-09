@@ -48,8 +48,8 @@ implementation:
         def register_model_allinone(model_name, uri_or_repo, user_token, author, storage_key, model_format, description, version, metadata):
             if not user_token:
                 raise ValueError("User token is required for secure connection.")
-                 # http://model-registry-service.kubeflow.svc.cluster.local:9090
-            base_url = "http://localhost:8080"
+                 
+            base_url = "http://model-registry-service.kubeflow.svc.cluster.local:8080"
             is_secure = False
 
             registry = ModelRegistry(
