@@ -54,15 +54,11 @@ implementation:
             
             print("Base URL:", base_url)
             print("is_secure:", is_secure)
+            
+            # registry = ModelRegistry("http://server-address", 8080, author="Ada Lovelace", is_secure=False)
+            registry = ModelRegistry(base_url, 8080, author="swag", is_secure=False)
 
-            registry = ModelRegistry(
-                server_address=base_url,
-                8080,
-                author=author or "Anonymous",
-                is_secure=is_secure
-            )
-
-            version_int = int(version)
+            version_int = version
 
             if is_huggingface_model(uri_or_repo):
                 return registry.register_huggingface_model(
