@@ -24,7 +24,7 @@ implementation:
       - sh
       - -c
       - |
-        pip install --pre model-registry==0.2.20
+        pip install --pre model-registry
         python3 -u -c "$0" "$@"
       - |
         import argparse, os, json
@@ -83,6 +83,10 @@ implementation:
                 if not storage_key:
                     raise ValueError("Storage key required for S3 URIs.")
                 uri_or_repo = utils.s3_uri_from(uri_or_repo.replace("s3://", ""), storage_key)
+
+            print("Base URL:", base_url)
+            print("is_secure:", is_secure)
+
 
             return registry.register_model(
                 model_name,
