@@ -51,6 +51,9 @@ implementation:
                  
             base_url = "http://model-registry-service.kubeflow.svc.cluster.local:8080"
             is_secure = False
+            
+            print("Base URL:", base_url)
+            print("is_secure:", is_secure)
 
             registry = ModelRegistry(
                 server_address=base_url,
@@ -83,10 +86,6 @@ implementation:
                 if not storage_key:
                     raise ValueError("Storage key required for S3 URIs.")
                 uri_or_repo = utils.s3_uri_from(uri_or_repo.replace("s3://", ""), storage_key)
-
-            print("Base URL:", base_url)
-            print("is_secure:", is_secure)
-
 
             return registry.register_model(
                 model_name,
