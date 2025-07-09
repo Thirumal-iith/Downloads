@@ -54,9 +54,9 @@ implementation:
             
             print("Base URL:", base_url)
             print("is_secure:", is_secure)
-            
-            # registry = ModelRegistry("http://server-address", 8080, author="Ada Lovelace", is_secure=False)
-            registry = ModelRegistry(base_url, 8080, author="swag", is_secure=False)
+
+            # Pass user_token and author properly
+            registry = ModelRegistry(base_url, 8080, user_token=user_token, author=author, is_secure=is_secure)
 
             version_int = version
 
@@ -120,17 +120,18 @@ implementation:
             args.description, args.version, metadata
         )
 
+        # Safely write outputs
         os.makedirs(os.path.dirname(args.model), exist_ok=True)
         with open(args.model, "w") as f:
-            json.dump({"model": result.get("model") if isinstance(result, dict) else result.model}, f)
+            json.dump({"model": getattr(result, 'name', str(result))}, f)
 
         os.makedirs(os.path.dirname(args.model_version), exist_ok=True)
         with open(args.model_version, "w") as f:
-            json.dump({"model_version": result.get("model_version") if isinstance(result, dict) else result.version}, f)
+            json.dump({"model_version": getattr(result, 'version', "unknown")}, f)
 
         os.makedirs(os.path.dirname(args.model_artifacts), exist_ok=True)
         with open(args.model_artifacts, "w") as f:
-            json.dump({"model_artifacts": result.get("model_artifacts") if isinstance(result, dict) else result.artifacts}, f)
+            json.dump({"model_artifacts": getattr(result, 'artifacts', [])}, f)
 
     args:
       - --model_name
