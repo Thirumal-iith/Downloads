@@ -77,7 +77,8 @@ implementation:
             if uri_or_repo.startswith("minio://"):
                 if not storage_key:
                     raise ValueError("Storage key required for MinIO URIs.")
-                uri_or_repo = utils.s3_uri_from(uri_or_repo.replace("minio://", ""), storage_key)
+                # uri_or_repo = utils.s3_uri_from(uri_or_repo.replace("minio://", ""), storage_key)
+                uri_or_repo = utils.s3_uri_from(uri_or_repo,"models")
             elif uri_or_repo.startswith("s3://"):
                 if not storage_key:
                     raise ValueError("Storage key required for S3 URIs.")
