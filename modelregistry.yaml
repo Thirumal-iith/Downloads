@@ -76,13 +76,25 @@ implementation:
                 if not storage_key:
                     raise ValueError("Storage key required for MinIO URIs.")
                 endpoint = "http://minio-service.kubeflow.svc.cluster.local:9000"
-                uri_or_repo = utils.s3_uri_from(uri_or_repo.replace("minio://", ""), "models", storage_key=storage_key, endpoint=endpoint)
+                metadata["endpoint"] = endpoint
+                uri_or_repo = utils.s3_uri_from(
+                    uri_or_repo.replace("minio://", ""),
+                    "models",
+                    storage_key=storage_key,
+                    metadata=metadata
+                )
 
             elif uri_or_repo.startswith("s3://"):
                 if not storage_key:
                     raise ValueError("Storage key required for S3 URIs.")
                 endpoint = "https://s3.amazonaws.com"
-                uri_or_repo = utils.s3_uri_from(uri_or_repo.replace("s3://", ""), "models", storage_key=storage_key, endpoint=endpoint)
+                metadata["endpoint"] = endpoint
+                uri_or_repo = utils.s3_uri_from(
+                    uri_or_repo.replace("s3://", ""),
+                    "models",
+                    storage_key=storage_key,
+                    metadata=metadata
+                )
 
             return registry.register_model(
                 model_name,
