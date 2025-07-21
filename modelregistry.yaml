@@ -58,6 +58,7 @@ implementation:
             registry = ModelRegistry(base_url, 8080, user_token=user_token, author=author, is_secure=is_secure)
             version_int = version
 
+            # Handle HuggingFace model case
             if is_huggingface_model(uri_or_repo):
                 return registry.register_huggingface_model(
                     model_name,
@@ -67,33 +68,39 @@ implementation:
                     metadata=metadata
                 )
 
+            # Infer format if not provided
             if not model_format:
                 model_format = infer_model_format(uri_or_repo)
                 if model_format == "unknown":
                     raise ValueError(f"Unknown model format for URI: {uri_or_repo}")
 
+            # MinIO path handling
             if uri_or_repo.startswith("minio://"):
                 if not storage_key:
                     raise ValueError("Storage key required for MinIO URIs.")
                 endpoint = "http://minio-service.kubeflow.svc.cluster.local:9000"
-                metadata["endpoint"] = endpoint
+                object_path = uri_or_repo.replace("minio://", "")
                 uri_or_repo = utils.s3_uri_from(
-                    uri_or_repo.replace("minio://", ""),
-                    "models",
-                    metadata=metadata
+                    object_path,
+                    bucket="models",
+                    storage_key=storage_key,
+                    endpoint=endpoint
                 )
 
+            # S3 path handling
             elif uri_or_repo.startswith("s3://"):
                 if not storage_key:
                     raise ValueError("Storage key required for S3 URIs.")
                 endpoint = "https://s3.amazonaws.com"
-                metadata["endpoint"] = endpoint
+                object_path = uri_or_repo.replace("s3://", "")
                 uri_or_repo = utils.s3_uri_from(
-                    uri_or_repo.replace("s3://", ""),
-                    "models",
-                    metadata=metadata
+                    object_path,
+                    bucket="models",
+                    storage_key=storage_key,
+                    endpoint=endpoint
                 )
 
+            # Register the model
             return registry.register_model(
                 model_name,
                 uri=uri_or_repo,
@@ -131,6 +138,7 @@ implementation:
             args.description, args.version, metadata
         )
 
+        # Write outputs
         os.makedirs(os.path.dirname(args.model), exist_ok=True)
         with open(args.model, "w") as f:
             json.dump({"model": getattr(result, 'name', str(result))}, f)
