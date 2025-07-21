@@ -91,7 +91,6 @@ implementation:
                 uri_or_repo = utils.s3_uri_from(
                     uri_or_repo.replace("s3://", ""),
                     "models",
-                    storage_key=storage_key,
                     metadata=metadata
                 )
 
