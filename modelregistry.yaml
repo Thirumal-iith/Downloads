@@ -80,7 +80,6 @@ implementation:
                 uri_or_repo = utils.s3_uri_from(
                     uri_or_repo.replace("minio://", ""),
                     "models",
-                    storage_key=storage_key,
                     metadata=metadata
                 )
 
