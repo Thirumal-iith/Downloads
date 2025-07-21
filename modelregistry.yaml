@@ -79,12 +79,11 @@ implementation:
                 if not storage_key:
                     raise ValueError("Storage key required for MinIO URIs.")
                 endpoint = "http://minio-service.kubeflow.svc.cluster.local:9000"
-                object_path = uri_or_repo.replace("minio://", "")
+                metadata["endpoint"] = endpoint
                 uri_or_repo = utils.s3_uri_from(
-                    object_path,
-                    bucket="models",
-                    storage_key=storage_key,
-                    endpoint=endpoint
+                    uri_or_repo.replace("minio://", ""),
+                    "models",
+                    metadata=metadata
                 )
 
             # S3 path handling
@@ -92,12 +91,11 @@ implementation:
                 if not storage_key:
                     raise ValueError("Storage key required for S3 URIs.")
                 endpoint = "https://s3.amazonaws.com"
-                object_path = uri_or_repo.replace("s3://", "")
+                metadata["endpoint"] = endpoint
                 uri_or_repo = utils.s3_uri_from(
-                    object_path,
-                    bucket="models",
-                    storage_key=storage_key,
-                    endpoint=endpoint
+                    uri_or_repo.replace("s3://", ""),
+                    "models",
+                    metadata=metadata
                 )
 
             # Register the model
@@ -175,4 +173,4 @@ implementation:
       - --model_version
       - {outputPath: model_version}
       - --model_artifacts
-      - {outputPath: model_artifacts}
+      - {outputPath: model_artifact}
