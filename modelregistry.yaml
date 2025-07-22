@@ -90,7 +90,7 @@ implementation:
                     raise ValueError("Storage key required for S3 URIs.")
                 uri_or_repo = utils.s3_uri_from(
                     # uri_or_repo.replace("s3://", ""),
-                    uri_or_repo
+                    uri_or_repo,
                     "models"
                 )
 
