@@ -86,7 +86,7 @@ implementation:
                 result = registry.register_hf_model(
                     repo_id=model_path,
                     model_file=hf_model_file,
-                    model_name=model_name,
+                    model_name,
                     version=version,
                     description=description,
                     model_format_name=model_format,
@@ -95,7 +95,7 @@ implementation:
                 )
             elif is_http_url(model_path):
                 result = registry.register_model(
-                    model_name=model_name,
+                    model_name,
                     uri=model_path,
                     version=version,
                     description=description,
@@ -110,7 +110,7 @@ implementation:
                 object_path = path_parts[1] if len(path_parts) > 1 else ""
                 
                 result = registry.register_model(
-                    model_name=model_name,
+                    model_name,
                     uri=utils.s3_uri_from(
                         path=object_path,
                         bucket=bucket,
@@ -126,7 +126,7 @@ implementation:
                 )
             else:  # Local path
                 result = registry.register_model(
-                    model_name=model_name,
+                    model_name,
                     uri=model_path,
                     version=version,
                     description=description,
