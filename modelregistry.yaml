@@ -45,9 +45,10 @@ implementation:
             }.get(ext, "unknown")
 
         def is_huggingface_model(model_path):
-            return (isinstance(model_path, str) and "/" in model_path and not any(
-                model_path.startswith(prefix) 
-                for prefix in ("http://", "https://", "s3://", "minio://", "/"))
+            return (isinstance(model_path, str) and 
+                   "/" in model_path and 
+                   not any(model_path.startswith(prefix) 
+                          for prefix in ("http://", "https://", "s3://", "minio://", "/")))
 
         def is_http_url(model_path):
             try:
@@ -159,15 +160,20 @@ implementation:
                 args.description, args.version, args.metadata, args.hf_model_file
             )
 
-            # Write outputs
-            def write_output(path, data):
-                os.makedirs(os.path.dirname(path), exist_ok=True)
-                with open(path, "w") as f:
-                    json.dump(data, f)
+            # Create output directories
+            os.makedirs(os.path.dirname(args.model), exist_ok=True)
+            os.makedirs(os.path.dirname(args.model_version), exist_ok=True)
+            os.makedirs(os.path.dirname(args.model_artifacts), exist_ok=True)
 
-            write_output(args.model, {"model": getattr(result, 'name', str(result))})
-            write_output(args.model_version, {"model_version": getattr(result, 'version', "unknown")})
-            write_output(args.model_artifacts, {"model_artifacts": getattr(result, 'artifacts', [])})
+            # Write outputs
+            with open(args.model, "w") as f:
+                json.dump({"model": getattr(result, 'name', str(result))}, f)
+
+            with open(args.model_version, "w") as f:
+                json.dump({"model_version": getattr(result, 'version', "unknown")}, f)
+
+            with open(args.model_artifacts, "w") as f:
+                json.dump({"model_artifacts": getattr(result, 'artifacts', [])}, f)
 
         except Exception as e:
             print(f"Error registering model: {str(e)}")
