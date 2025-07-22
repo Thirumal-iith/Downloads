@@ -3,14 +3,15 @@ description: Registers a model to the model registry from local path, URL, MinIO
 
 inputs:
   - {name: model_name, type: String}
-  - {name: uri_or_repo, type: String}
+  - {name: model_path, type: String}
   - {name: user_token, type: String}
   - {name: author, type: String, optional: true, default: ""}
   - {name: storage_key, type: String, optional: true, default: ""}
   - {name: model_format, type: String, optional: true, default: ""}
   - {name: description, type: String, optional: true, default: "No description provided"}
-  - {name: version, type: String, optional: true, default: "1"}
+  - {name: version, type: String, optional: true, default: "1.0.0"}
   - {name: metadata, type: String, optional: true, default: "{}"}
+  - {name: hf_model_file, type: String, optional: true, default: ""}
 
 outputs:
   - {name: model, type: String}
@@ -24,132 +25,159 @@ implementation:
       - sh
       - -c
       - |
-        pip install --pre model-registry
+        pip install --pre model-registry[hf]
         python3 -u -c "$0" "$@"
       - |
         import argparse, os, json
         from urllib.parse import urlparse
         from model_registry import ModelRegistry, utils
 
-        def infer_model_format(uri):
-            ext = os.path.splitext(uri)[1].lower()
+        def infer_model_format(model_path):
+            ext = os.path.splitext(model_path)[1].lower()
             return {
                 ".onnx": "onnx",
                 ".pkl": "sklearn",
                 ".pt": "pytorch",
                 ".joblib": "sklearn",
                 ".h5": "keras",
-                ".sav": "sklearn"
+                ".sav": "sklearn",
+                ".tgz": "compressed"
             }.get(ext, "unknown")
 
-        def is_huggingface_model(uri_or_repo):
-            return isinstance(uri_or_repo, str) and "/" in uri_or_repo and not uri_or_repo.startswith(("http", "s3://", "minio://", "/"))
+        def is_huggingface_model(model_path):
+            return (isinstance(model_path, str) and "/" in model_path and not any(
+                model_path.startswith(prefix) 
+                for prefix in ("http://", "https://", "s3://", "minio://", "/"))
 
-        def register_model_allinone(model_name, uri_or_repo, user_token, author, storage_key, model_format, description, version, metadata):
+        def is_http_url(model_path):
+            try:
+                result = urlparse(model_path)
+                return all([result.scheme in ['http', 'https'], result.netloc])
+            except:
+                return False
+
+        def register_model_allinone(model_name, model_path, user_token, author, 
+                                  storage_key, model_format, description, version, 
+                                  metadata, hf_model_file):
             if not user_token:
                 raise ValueError("User token is required for secure connection.")
 
-            base_url = "http://model-registry-service.kubeflow.svc.cluster.local"
-            is_secure = False
+            registry = ModelRegistry(
+                base_url="http://model-registry-service.kubeflow.svc.cluster.local",
+                port=8080,
+                user_token=user_token,
+                author=author,
+                is_secure=False
+            )
+            
+            try:
+                metadata = json.loads(metadata) if metadata else {}
+            except:
+                metadata = {}
 
-            print("Base URL:", base_url)
-            print("is_secure:", is_secure)
+            model_format = model_format or infer_model_format(model_path)
 
-            registry = ModelRegistry(base_url, 8080, user_token=user_token, author=author, is_secure=is_secure)
-            version_int = version
-
-            # Handle HuggingFace model case
-            if is_huggingface_model(uri_or_repo):
-                return registry.register_huggingface_model(
-                    model_name,
-                    repo_id=uri_or_repo,
+            # Handle different model path types
+            if is_huggingface_model(model_path):
+                if not hf_model_file:
+                    raise ValueError("hf_model_file parameter required for HuggingFace models")
+                    
+                result = registry.register_hf_model(
+                    repo_id=model_path,
+                    model_file=hf_model_file,
+                    model_name=model_name,
+                    version=version,
                     description=description,
-                    version=version_int,
+                    model_format_name=model_format,
+                    model_format_version="1",
                     metadata=metadata
                 )
-
-            # Infer format if not provided
-            if not model_format:
-                model_format = infer_model_format(uri_or_repo)
-                if model_format == "unknown":
-                    raise ValueError(f"Unknown model format for URI: {uri_or_repo}")
-
-            # MinIO path handling
-            if uri_or_repo.startswith("minio://"):
-                if not storage_key:
-                    raise ValueError("Storage key required for MinIO URIs.")
-                uri_or_repo = utils.s3_uri_from(
-                    # uri_or_repo.replace("minio://", ""),
-                    uri_or_repo,
-                    "models"
+            elif is_http_url(model_path):
+                result = registry.register_model(
+                    model_name=model_name,
+                    uri=model_path,
+                    version=version,
+                    description=description,
+                    model_format_name=model_format,
+                    model_format_version="1",
+                    storage_key=storage_key,
+                    metadata=metadata
                 )
-
-            # S3 path handling
-            elif uri_or_repo.startswith("s3://"):
-                if not storage_key:
-                    raise ValueError("Storage key required for S3 URIs.")
-                uri_or_repo = utils.s3_uri_from(
-                    # uri_or_repo.replace("s3://", ""),
-                    uri_or_repo,
-                    "models"
+            elif model_path.startswith(("s3://", "minio://")):
+                path_parts = model_path.replace("s3://", "").replace("minio://", "").split("/", 1)
+                bucket = path_parts[0]
+                object_path = path_parts[1] if len(path_parts) > 1 else ""
+                
+                result = registry.register_model(
+                    model_name=model_name,
+                    uri=utils.s3_uri_from(
+                        path=object_path,
+                        bucket=bucket,
+                        endpoint=metadata.get("bucket_endpoint"),
+                        region=metadata.get("bucket_region")
+                    ),
+                    version=version,
+                    description=description,
+                    model_format_name=model_format,
+                    model_format_version="1",
+                    storage_key=storage_key,
+                    metadata=metadata
                 )
-
-            # Register the model
-            return registry.register_model(
-                model_name,
-                uri=uri_or_repo,
-                description=description,
-                version=version_int,
-                model_format_name=model_format,
-                model_format_version="1",
-                storage_key=storage_key,
-                metadata=metadata
-            )
+            else:  # Local path
+                result = registry.register_model(
+                    model_name=model_name,
+                    uri=model_path,
+                    version=version,
+                    description=description,
+                    model_format_name=model_format,
+                    model_format_version="1",
+                    storage_key=storage_key,
+                    metadata=metadata
+                )
+            return result
 
         parser = argparse.ArgumentParser()
         parser.add_argument("--model_name", required=True)
-        parser.add_argument("--uri_or_repo", required=True)
+        parser.add_argument("--model_path", required=True)
         parser.add_argument("--user_token", required=True)
-        parser.add_argument("--author")
-        parser.add_argument("--storage_key")
-        parser.add_argument("--model_format")
-        parser.add_argument("--description")
-        parser.add_argument("--version")
-        parser.add_argument("--metadata")
-        parser.add_argument("--model")
-        parser.add_argument("--model_version")
-        parser.add_argument("--model_artifacts")
+        parser.add_argument("--author", default="")
+        parser.add_argument("--storage_key", default="")
+        parser.add_argument("--model_format", default="")
+        parser.add_argument("--description", default="No description provided")
+        parser.add_argument("--version", default="1.0.0")
+        parser.add_argument("--metadata", default="{}")
+        parser.add_argument("--hf_model_file", default="")
+        parser.add_argument("--model", required=True)
+        parser.add_argument("--model_version", required=True)
+        parser.add_argument("--model_artifacts", required=True)
         args = parser.parse_args()
 
         try:
-            metadata = json.loads(args.metadata) if args.metadata else {}
-        except Exception:
-            metadata = {}
+            result = register_model_allinone(
+                args.model_name, args.model_path,
+                args.user_token, args.author, args.storage_key, args.model_format,
+                args.description, args.version, args.metadata, args.hf_model_file
+            )
 
-        result = register_model_allinone(
-            args.model_name, args.uri_or_repo,
-            args.user_token, args.author, args.storage_key, args.model_format,
-            args.description, args.version, metadata
-        )
+            # Write outputs
+            def write_output(path, data):
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, "w") as f:
+                    json.dump(data, f)
 
-        # Write outputs
-        os.makedirs(os.path.dirname(args.model), exist_ok=True)
-        with open(args.model, "w") as f:
-            json.dump({"model": getattr(result, 'name', str(result))}, f)
+            write_output(args.model, {"model": getattr(result, 'name', str(result))})
+            write_output(args.model_version, {"model_version": getattr(result, 'version', "unknown")})
+            write_output(args.model_artifacts, {"model_artifacts": getattr(result, 'artifacts', [])})
 
-        os.makedirs(os.path.dirname(args.model_version), exist_ok=True)
-        with open(args.model_version, "w") as f:
-            json.dump({"model_version": getattr(result, 'version', "unknown")}, f)
-
-        os.makedirs(os.path.dirname(args.model_artifacts), exist_ok=True)
-        with open(args.model_artifacts, "w") as f:
-            json.dump({"model_artifacts": getattr(result, 'artifacts', [])}, f)
+        except Exception as e:
+            print(f"Error registering model: {str(e)}")
+            raise
 
     args:
       - --model_name
       - {inputValue: model_name}
-      - --uri_or_repo
-      - {inputValue: uri_or_repo}
+      - --model_path
+      - {inputValue: model_path}
       - --user_token
       - {inputValue: user_token}
       - --author
@@ -164,6 +192,8 @@ implementation:
       - {inputValue: version}
       - --metadata
       - {inputValue: metadata}
+      - --hf_model_file
+      - {inputValue: hf_model_file}
       - --model
       - {outputPath: model}
       - --model_version
