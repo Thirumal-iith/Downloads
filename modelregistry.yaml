@@ -84,9 +84,9 @@ implementation:
                     raise ValueError("hf_model_file parameter required for HuggingFace models")
                     
                 result = registry.register_hf_model(
+                    model_name,
                     repo_id=model_path,
                     model_file=hf_model_file,
-                    model_name,
                     version=version,
                     description=description,
                     model_format_name=model_format,
