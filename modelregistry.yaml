@@ -64,8 +64,8 @@ implementation:
                 raise ValueError("User token is required for secure connection.")
 
             registry = ModelRegistry(
-                base_url="http://model-registry-service.kubeflow.svc.cluster.local",
-                port=8080,
+                "http://model-registry-service.kubeflow.svc.cluster.local",
+                8080,
                 user_token=user_token,
                 author=author,
                 is_secure=False
