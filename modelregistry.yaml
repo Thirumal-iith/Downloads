@@ -79,7 +79,8 @@ implementation:
                 if not storage_key:
                     raise ValueError("Storage key required for MinIO URIs.")
                 uri_or_repo = utils.s3_uri_from(
-                    uri_or_repo.replace("minio://", ""),
+                    # uri_or_repo.replace("minio://", ""),
+                    uri_or_repo,
                     "models"
                 )
 
@@ -88,7 +89,8 @@ implementation:
                 if not storage_key:
                     raise ValueError("Storage key required for S3 URIs.")
                 uri_or_repo = utils.s3_uri_from(
-                    uri_or_repo.replace("s3://", ""),
+                    # uri_or_repo.replace("s3://", ""),
+                    uri_or_repo
                     "models"
                 )
 
