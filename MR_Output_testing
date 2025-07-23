@@ -31,6 +31,7 @@ implementation:
         import argparse, os, json
         from urllib.parse import urlparse
         from model_registry import ModelRegistry, utils
+        import dataclasses
 
         def infer_model_format(model_path):
             ext = os.path.splitext(model_path)[1].lower()
@@ -56,6 +57,15 @@ implementation:
                 return all([result.scheme in ['http', 'https'], result.netloc])
             except:
                 return False
+
+        def serialize(obj):
+            try:
+                return dataclasses.asdict(obj)
+            except:
+                try:
+                    return obj.__dict__
+                except:
+                    return str(obj)
 
         def register_model_allinone(model_name, model_path, user_token, author, 
                                     storage_key, model_format, description, version, 
@@ -166,23 +176,24 @@ implementation:
             model_artifact = registry.get_model_artifact(args.model_name, getattr(result, "version", args.version))
 
             print("RegisteredModel:")
-            print(registered_model)
+            print(serialize(registered_model))
             print("ModelVersion:")
-            print(model_version)
+            print(serialize(model_version))
             print("ModelArtifact:")
-            print(model_artifact)
+            print(serialize(model_artifact))
 
+            # ✅ Write full JSON-serialized objects
             with open(args.model, "w") as f:
-                json.dump({"model": getattr(result, 'name', str(result))}, f)
+                json.dump(serialize(registered_model), f, indent=2)
 
             with open(args.model_version, "w") as f:
-                json.dump({"model_version": getattr(result, 'version', "unknown")}, f)
+                json.dump(serialize(model_version), f, indent=2)
 
             with open(args.model_artifacts, "w") as f:
-                json.dump({"model_artifacts": getattr(model_artifact, 'uri', [])}, f)
+                json.dump(serialize(model_artifact), f, indent=2)
 
         except Exception as e:
-            print(f"Error registering model: {str(e)}")
+            print(f"❌ Error registering model: {str(e)}")
             raise
 
     args:
